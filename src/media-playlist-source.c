@@ -17,12 +17,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 #include "media-playlist-source.h"
+#include <obs-frontend-api.h>
 
 #define S_PLAYLIST "playlist"
 #define S_LOOP "loop"
 #define S_SHUFFLE "shuffle"
 #define S_VISIBILITY_BEHAVIOR "visibility_behavior"
 #define S_RESTART_BEHAVIOR "restart_behavior"
+#define S_GO_TO_SCENE "go_to_scene"
 #define S_CURRENT_FILE_NAME "current_file_name"
 #define S_SELECT_FILE "select_file"
 
@@ -53,6 +55,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #define T_RESTART_BEHAVIOR T_("RestartBehavior")
 #define T_RESTART_BEHAVIOR_CURRENT_FILE T_("RestartBehavior.CurrentFile")
 #define T_RESTART_BEHAVIOR_FIRST_FILE T_("RestartBehavior.FirstFile")
+#define T_GO_TO_SCENE T_("GoToScene")
 #define T_CURRENT_FILE_NAME T_("CurrentFileName")
 #define T_SELECT_FILE T_("SelectFile")
 #define T_NO_FILE_SELECTED T_("NoFileSelected")
@@ -376,7 +379,17 @@ static void media_source_ended(void *data, calldata_t *cd)
 	if (mps->user_stopped) {
 		mps->user_stopped = false;
 		return;
-	} else if (mps->current_media_index < mps->files.num - 1 || mps->loop) {
+	} 
+	
+	if (mps->go_to_scene && *mps->go_to_scene) {
+		obs_source_t *scene = obs_get_source_by_name(mps->go_to_scene);
+		if (scene) {
+			obs_frontend_set_current_scene(scene);
+			obs_source_release(scene);
+		}
+	}
+
+	if (mps->current_media_index < mps->files.num - 1 || mps->loop) {
 		obs_source_media_next(mps->source);
 	} else {
 		mps_end_reached(mps);
@@ -747,6 +760,7 @@ static void mps_destroy(void *data)
 	pthread_mutex_destroy(&mps->mutex);
 	pthread_mutex_destroy(&mps->audio_mutex);
 	bfree(mps->current_media_filename);
+	bfree(mps->go_to_scene);
 	bfree(mps);
 }
 
@@ -958,6 +972,7 @@ static void mps_defaults(obs_data_t *settings)
 	obs_data_set_default_bool(settings, S_SHUFFLE, false);
 	obs_data_set_default_int(settings, S_VISIBILITY_BEHAVIOR, VISIBILITY_BEHAVIOR_STOP_RESTART);
 	obs_data_set_default_int(settings, S_RESTART_BEHAVIOR, RESTART_BEHAVIOR_CURRENT_FILE);
+	obs_data_set_default_string(settings, S_GO_TO_SCENE, "");
 	obs_data_set_default_string(settings, S_CURRENT_FILE_NAME, " ");
 	obs_data_set_default_int(settings, S_SPEED, 100);
 }
@@ -1044,6 +1059,18 @@ static obs_properties_t *mps_properties(void *data)
 				    OBS_COMBO_FORMAT_INT);
 	obs_property_list_add_int(p, T_RESTART_BEHAVIOR_CURRENT_FILE, RESTART_BEHAVIOR_CURRENT_FILE);
 	obs_property_list_add_int(p, T_RESTART_BEHAVIOR_FIRST_FILE, RESTART_BEHAVIOR_FIRST_FILE);
+
+	p = obs_properties_add_list(props, S_GO_TO_SCENE, T_GO_TO_SCENE, OBS_COMBO_TYPE_LIST,
+				    OBS_COMBO_FORMAT_STRING);
+	obs_property_list_add_string(p, "", "");
+	char **scenes = obs_frontend_get_scene_names();
+	if (scenes) {
+		for (size_t i = 0; scenes[i] != NULL; i++) {
+			obs_property_list_add_string(p, scenes[i], scenes[i]);
+			bfree(scenes[i]);
+		}
+		bfree(scenes);
+	}
 
 	obs_properties_add_bool(props, S_FFMPEG_HW_DECODE, T_USE_HARDWARE_DECODING);
 
@@ -1188,6 +1215,9 @@ static void mps_update(void *data, obs_data_t *settings)
 		visibility_behavior_changed = true;
 	}
 	mps->restart_behavior = obs_data_get_int(settings, S_RESTART_BEHAVIOR);
+	const char *scene_name = obs_data_get_string(settings, S_GO_TO_SCENE);
+	bfree(mps->go_to_scene);
+	mps->go_to_scene = scene_name && *scene_name ? bstrdup(scene_name) : NULL;
 	shuffle = obs_data_get_bool(settings, S_SHUFFLE);
 	shuffle_changed = mps->shuffle != shuffle;
 	mps->shuffle = shuffle;

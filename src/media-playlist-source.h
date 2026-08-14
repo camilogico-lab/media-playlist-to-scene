@@ -75,6 +75,7 @@ struct media_playlist_source {
 	enum obs_media_state state;
 	enum visibility_behavior visibility_behavior;
 	enum restart_behavior restart_behavior;
+	char *go_to_scene;
 
 	struct deque audio_data[MAX_AUDIO_CHANNELS];
 	struct deque audio_frames;
