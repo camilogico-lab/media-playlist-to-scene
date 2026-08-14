@@ -1028,6 +1028,7 @@ static obs_properties_t *mps_properties(void *data)
 	struct dstr exts = {0};
 	struct dstr path = {0};
 	obs_property_t *p;
+	char **scenes;
 
 	obs_properties_add_bool(props, S_LOOP, T_LOOP);
 	obs_properties_add_bool(props, S_SHUFFLE, T_SHUFFLE);
@@ -1063,7 +1064,7 @@ static obs_properties_t *mps_properties(void *data)
 	p = obs_properties_add_list(props, S_GO_TO_SCENE, T_GO_TO_SCENE, OBS_COMBO_TYPE_LIST,
 				    OBS_COMBO_FORMAT_STRING);
 	obs_property_list_add_string(p, "", "");
-	char **scenes = obs_frontend_get_scene_names();
+	scenes = obs_frontend_get_scene_names();
 	if (scenes) {
 		for (size_t i = 0; scenes[i] != NULL; i++) {
 			obs_property_list_add_string(p, scenes[i], scenes[i]);
@@ -1203,6 +1204,7 @@ static void mps_update(void *data, obs_data_t *settings)
 	bool restart_on_activate = true;
 	const char *old_media_path = NULL;
 	long long new_speed;
+	const char *scene_name;
 	//const char *mode;
 
 	/* ------------------------------------- */
@@ -1215,7 +1217,7 @@ static void mps_update(void *data, obs_data_t *settings)
 		visibility_behavior_changed = true;
 	}
 	mps->restart_behavior = obs_data_get_int(settings, S_RESTART_BEHAVIOR);
-	const char *scene_name = obs_data_get_string(settings, S_GO_TO_SCENE);
+	scene_name = obs_data_get_string(settings, S_GO_TO_SCENE);
 	bfree(mps->go_to_scene);
 	mps->go_to_scene = scene_name && *scene_name ? bstrdup(scene_name) : NULL;
 	shuffle = obs_data_get_bool(settings, S_SHUFFLE);
