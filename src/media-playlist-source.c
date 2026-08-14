@@ -1068,7 +1068,6 @@ static obs_properties_t *mps_properties(void *data)
 	if (scenes) {
 		for (size_t i = 0; scenes[i] != NULL; i++) {
 			obs_property_list_add_string(p, scenes[i], scenes[i]);
-			bfree(scenes[i]);
 		}
 		bfree(scenes);
 	}
