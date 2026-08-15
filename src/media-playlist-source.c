@@ -52,9 +52,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #define T_VISIBILITY_BEHAVIOR_PAUSE_UNPAUSE T_("VisibilityBehavior.PauseUnpause")
 #define T_VISIBILITY_BEHAVIOR_ALWAYS_PLAY T_("VisibilityBehavior.AlwaysPlay")
 #define T_VISIBILITY_BEHAVIOR_STOP_PLAY_NEXT T_("VisibilityBehavior.StopPlayNext")
+#define T_VISIBILITY_BEHAVIOR_STOP T_("VisibilityBehavior.Stop")
 #define T_RESTART_BEHAVIOR T_("RestartBehavior")
 #define T_RESTART_BEHAVIOR_CURRENT_FILE T_("RestartBehavior.CurrentFile")
 #define T_RESTART_BEHAVIOR_FIRST_FILE T_("RestartBehavior.FirstFile")
+#define T_RESTART_BEHAVIOR_NEXT_FILE T_("RestartBehavior.NextFile")
 #define T_GO_TO_SCENE T_("GoToScene")
 #define T_CURRENT_FILE_NAME T_("CurrentFileName")
 #define T_SELECT_FILE T_("SelectFile")
@@ -386,6 +388,10 @@ static void media_source_ended(void *data, calldata_t *cd)
 		if (scene) {
 			obs_frontend_set_current_scene(scene);
 			obs_source_release(scene);
+			
+			mps->user_stopped = true;
+			obs_source_media_stop(mps->source);
+			return;
 		}
 	}
 
@@ -583,6 +589,8 @@ static void mps_restart(void *data)
 
 	if (mps->restart_behavior == RESTART_BEHAVIOR_FIRST_FILE) {
 		play_media_at_index(mps, 0, false);
+	} else if (mps->restart_behavior == RESTART_BEHAVIOR_NEXT_FILE) {
+		mps_playlist_next(mps);
 	} else if (mps->restart_behavior == RESTART_BEHAVIOR_CURRENT_FILE) {
 		if (mps->state == OBS_MEDIA_STATE_ENDED) {
 			// Make sure that the first file is selected
@@ -726,6 +734,8 @@ static void mps_activate(void *data)
 		obs_source_media_play_pause(mps->source, false);
 	} else if (mps->visibility_behavior == VISIBILITY_BEHAVIOR_STOP_PLAY_NEXT) {
 		// we only play next when the source is deactivated so we don't do anything here
+	} else if (mps->visibility_behavior == VISIBILITY_BEHAVIOR_STOP) {
+		// Do nothing, wait for user input or restart
 	}
 }
 
@@ -742,6 +752,9 @@ static void mps_deactivate(void *data)
 		mps->user_stopped = true;
 		obs_source_media_stop(mps->source);
 		obs_source_media_next(mps->source);
+	} else if (mps->visibility_behavior == VISIBILITY_BEHAVIOR_STOP) {
+		mps->user_stopped = true;
+		obs_source_media_stop(mps->source);
 	}
 }
 
@@ -1055,11 +1068,13 @@ static obs_properties_t *mps_properties(void *data)
 	obs_property_list_add_int(p, T_VISIBILITY_BEHAVIOR_STOP_PLAY_NEXT, VISIBILITY_BEHAVIOR_STOP_PLAY_NEXT);
 	obs_property_list_add_int(p, T_VISIBILITY_BEHAVIOR_PAUSE_UNPAUSE, VISIBILITY_BEHAVIOR_PAUSE_UNPAUSE);
 	obs_property_list_add_int(p, T_VISIBILITY_BEHAVIOR_ALWAYS_PLAY, VISIBILITY_BEHAVIOR_ALWAYS_PLAY);
+	obs_property_list_add_int(p, T_VISIBILITY_BEHAVIOR_STOP, VISIBILITY_BEHAVIOR_STOP);
 
 	p = obs_properties_add_list(props, S_RESTART_BEHAVIOR, T_RESTART_BEHAVIOR, OBS_COMBO_TYPE_LIST,
 				    OBS_COMBO_FORMAT_INT);
 	obs_property_list_add_int(p, T_RESTART_BEHAVIOR_CURRENT_FILE, RESTART_BEHAVIOR_CURRENT_FILE);
 	obs_property_list_add_int(p, T_RESTART_BEHAVIOR_FIRST_FILE, RESTART_BEHAVIOR_FIRST_FILE);
+	obs_property_list_add_int(p, T_RESTART_BEHAVIOR_NEXT_FILE, RESTART_BEHAVIOR_NEXT_FILE);
 
 	p = obs_properties_add_list(props, S_GO_TO_SCENE, T_GO_TO_SCENE, OBS_COMBO_TYPE_LIST,
 				    OBS_COMBO_FORMAT_STRING);
